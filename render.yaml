@@ -1,0 +1,15 @@
+# Render Blueprint specification for AERO-SAT ONE Mission Control
+services:
+  - type: web
+    name: aero-sat-one
+    runtime: static
+    buildCommand: ""
+    staticPublishPath: .
+    routes:
+      - type: rewrite
+        source: /*
+        destination: /index.html
+    headers:
+      - path: /*
+        name: Access-Control-Allow-Origin
+        value: "*"

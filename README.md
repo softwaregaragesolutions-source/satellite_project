@@ -119,3 +119,26 @@ The web dashboard (`index.html`) provides a complete mission control environment
 2. Open [`index.html`](file:///c:/Users/BB/OneDrive/Desktop/sat/index.html) in any modern browser (Chrome, Edge, Firefox).
 3. The dashboard will automatically lock onto `http://192.168.4.1/telemetry` and begin streaming live telemetry!
 4. To test without powering the ESP32, toggle **`SIMULATOR`** at the top right of the dashboard.
+
+---
+
+## 🌐 Deploy to Render (Free Static Site)
+
+You can host this Mission Control Ground Station dashboard on **Render** for free:
+
+1. Sign in to [Render.com](https://render.com).
+2. Click **New +** ➔ **Static Site**.
+3. Connect your repository: `softwaregaragesolutions-source/satellite_project`.
+4. Configure:
+   - **Name:** `aero-sat-ground-station`
+   - **Branch:** `main`
+   - **Build Command:** *(leave empty)*
+   - **Publish Directory:** `.`
+5. Click **Create Static Site**.
+
+> [!NOTE]
+> **Connecting to Local Hardware from HTTPS (Render)**:
+> Since Render serves sites over secure `https://`, browsers may block calls to local `http://192.168.4.1` under *Mixed Content* security.
+> - To connect to live ESP32 hardware from your Render URL: click the **tune / padlock icon** in your browser's address bar ➔ **Site settings** ➔ set **Insecure content** to **Allow**.
+> - Or, use the built-in **Simulator Mode** which runs 100% in-browser anywhere in the world!
+

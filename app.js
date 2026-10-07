@@ -410,7 +410,11 @@
       if (failedConsecutiveAttempts >= 4) {
         updateConnectionStatus('OFFLINE / UNREACHABLE', 'error', '--');
         if (failedConsecutiveAttempts === 4) {
-          logConsole('NETWORK', `Cannot reach ${config.endpoint}. Please connect to Wi-Fi "AERO-SAT-AP" (Pass: satellite123). Or switch to SIMULATOR mode.`, 'alert');
+          if (window.location.protocol === 'https:' && config.endpoint.startsWith('http:')) {
+            logConsole('SECURITY', `HTTPS Mixed-Content: Browser blocks http:// local calls from https:// origins (Render). In Chrome/Edge: click Site settings (padlock) > Insecure content: Allow, OR switch to SIMULATOR mode.`, 'warn');
+          } else {
+            logConsole('NETWORK', `Cannot reach ${config.endpoint}. Please connect to Wi-Fi "AERO-SAT-AP" (Pass: satellite123). Or switch to SIMULATOR mode.`, 'alert');
+          }
         }
       } else {
         updateConnectionStatus('CONNECTING...', 'reconnecting', '--');
