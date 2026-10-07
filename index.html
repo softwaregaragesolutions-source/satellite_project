@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>AERO-SAT ONE | Orbital Sensor Telemetry Ground Station</title>
+  <meta name="description" content="Mission Control Ground Station Dashboard for AERO-SAT ONE ESP32 telemetry. Real-time GPS tracking, 3D attitude indicator, waterproof temperature, moisture, solar LDR, and power bus monitoring.">
+  
+  <!-- Google Fonts for Aerospace HUD Aesthetics -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;700&family=Orbitron:wght@500;700;900&family=Rajdhani:wght@500;600;700&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+  
+  <!-- Leaflet CSS for GPS Satellite Map -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" integrity="sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=" crossorigin=""/>
+  
+  <!-- Chart.js for High-Frequency Telemetry Graphs -->
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+  
+  <!-- Leaflet JS -->
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js" integrity="sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=" crossorigin=""></script>
+
+  <link rel="stylesheet" href="style.css">
+</head>
+<body class="aerospace-theme">
+
+  <!-- TOP COMMAND MASTHEAD -->
+  <header class="mission-header" id="mission-header">
+    <div class="header-branding">
+      <div class="sat-logo-container">
+        <div class="sat-pulse-ring"></div>
+        <svg class="sat-icon" viewBox="0 0 24 24" width="28" height="28" fill="none" stroke="currentColor" stroke-width="1.8">
+          <circle cx="12" cy="12" r="3" />
+          <path d="M4.93 4.93l4.24 4.24M14.83 14.83l4.24 4.24M4.93 19.07l4.24-4.24M14.83 9.17l4.24-4.24" />
+          <path d="M12 2v4M12 18v4M2 12h4M18 12h4" />
+        </svg>
+      </div>
+      <div>
+        <div class="mission-callsign">
+          <span class="callsign-badge">SAT-1</span>
+          <h1>AERO-SAT ONE</h1>
+        </div>
+        <p class="mission-subtext">ORBITAL SENSOR TELEMETRY // MISSION CONTROL SYSTEM</p>
+      </div>
+    </div>
+
+    <!-- CONNECTION & QUICK CONTROLS -->
+    <div class="header-controls">
+      <!-- Link Mode Indicator -->
+      <div class="link-status-badge" id="link-status-badge">
+        <span class="status-dot pulsating" id="status-dot"></span>
+        <span class="status-text" id="status-text">INITIALIZING</span>
+      </div>
+
+      <!-- Mode Selector: Live Hardware vs Simulation -->
+      <div class="mode-toggle-group">
+        <button type="button" class="mode-btn active" id="btn-mode-live" title="Connect to ESP32 AP (192.168.4.1)">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M5 12.55a11 11 0 0 1 14.08 0M1.42 9a16 16 0 0 1 21.16 0M8.53 16.11a6 6 0 0 1 6.95 0M12 20h.01"/></svg>
+          ESP32 HARDWARE
+        </button>
+        <button type="button" class="mode-btn" id="btn-mode-sim" title="Run synthetic hardware telemetry simulation">
+          <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2v4M12 18v4M4.93 4.93l2.83 2.83M16.24 16.24l2.83 2.83M2 12h4M18 12h4M4.93 19.07l2.83-2.83M16.24 7.76l2.83-2.83"/></svg>
+          SIMULATOR
+        </button>
+      </div>
+
+      <!-- Mission Elapsed Time -->
+      <div class="met-card" title="Mission Elapsed Time">
+        <span class="met-label">MET</span>
+        <span class="met-clock" id="met-clock">00:00:00</span>
+      </div>
+
+      <!-- Audio Mute Toggle -->
+      <button type="button" class="icon-control-btn active" id="btn-audio-toggle" title="Toggle Mission Audio Synthesizer">
+        <svg id="icon-sound-on" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <path d="M15.54 8.46a5 5 0 0 1 0 7.07" />
+          <path d="M19.07 4.93a10 10 0 0 1 0 14.14" />
+        </svg>
+        <svg id="icon-sound-off" class="hidden" viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+          <polygon points="11 5 6 9 2 9 2 15 6 15 11 19 11 5" />
+          <line x1="23" y1="9" x2="17" y2="15" />
+          <line x1="17" y1="9" x2="23" y2="15" />
+        </svg>
+      </button>
+
+      <!-- Settings / Config Modal Trigger -->
+      <button type="button" class="icon-control-btn" id="btn-open-settings" title="Ground Station Link Settings">
+        <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none">
+          <circle cx="12" cy="12" r="3"/>
+          <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/>
+        </svg>
+      </button>
+    </div>
+  </header>
+
+  <!-- QUICK LINK BAR: Shows Endpoint URL & Health -->
+  <section class="quick-link-bar" id="quick-link-bar">
+    <div class="link-item">
+      <span class="link-tag">TELEMETRY LINK:</span>
+      <span class="link-val" id="disp-endpoint">http://192.168.4.1/telemetry</span>
+    </div>
+    <div class="link-item">
+      <span class="link-tag">DOWNLINK FREQ:</span>
+      <span class="link-val" id="disp-poll-rate">5.0 Hz (200ms)</span>
+    </div>
+    <div class="link-item">
+      <span class="link-tag">PACKETS RECV:</span>
+      <span class="link-val" id="disp-packet-count">0</span>
+    </div>
+    <div class="link-item">
+      <span class="link-tag">LATENCY / PING:</span>
+      <span class="link-val" id="disp-latency">-- ms</span>
+    </div>
+    <div class="link-item">
+      <span class="link-tag">RADIO RSSI:</span>
+      <span class="link-val" id="disp-rssi">-- dBm</span>
+    </div>
+  </section>
+
+  <!-- MAIN TELEMETRY WORKSPACE -->
+  <main class="mission-dashboard">
+
+    <!-- SENSOR TELEMETRY CARDS (GRID ROW 1) -->
+    <section class="metrics-grid" aria-label="Core Sensors Telemetry">
+
+      <!-- 1. WATERPROOF DS18B20 TEMPERATURE -->
+      <article class="metric-card card-temp" id="card-sensor-temp">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M14 14.76V3.5a2.5 2.5 0 0 0-5 0v11.26a4.5 4.5 0 1 0 5 0z"/></svg>
+            <span>DS18B20 TEMP</span>
+          </div>
+          <span class="card-badge" id="temp-condition-badge">NORMAL</span>
+        </div>
+        <div class="card-body">
+          <div class="primary-value-row">
+            <div class="big-metric" id="val-temp">25.0<span class="metric-unit">°C</span></div>
+            <button type="button" class="unit-swap-btn" id="btn-temp-unit" title="Switch °C / °F">°F</button>
+          </div>
+          <!-- Gauge Bar -->
+          <div class="gauge-bar-track">
+            <div class="gauge-bar-fill" id="gauge-temp" style="width: 45%;"></div>
+          </div>
+          <div class="sensor-sub-meta">
+            <span>Range: -55°C ~ +125°C</span>
+            <span id="sub-temp-peak">Max: 25.0°C</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="bus-tag">OneWire GPIO 4 (4.7kΩ Pull-Up)</span>
+        </div>
+      </article>
+
+      <!-- 2. VOLTAGE & POWER BUS -->
+      <article class="metric-card card-voltage" id="card-sensor-voltage">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+            <span>POWER & VOLTAGE</span>
+          </div>
+          <span class="card-badge badge-green" id="battery-status-badge">OPTIMAL</span>
+        </div>
+        <div class="card-body">
+          <div class="primary-value-row">
+            <div class="big-metric" id="val-voltage">4.10<span class="metric-unit">V</span></div>
+            <div class="battery-percent-tag" id="val-battery-pct">90%</div>
+          </div>
+          <!-- Visual Battery Gauge -->
+          <div class="battery-cell-wrap">
+            <div class="battery-terminal"></div>
+            <div class="battery-housing">
+              <div class="battery-fill" id="gauge-battery" style="width: 90%;"></div>
+            </div>
+          </div>
+          <div class="sensor-sub-meta">
+            <span>0-25V Ratio: 5.0x</span>
+            <span id="sub-voltage-state">1S LiPo Bus</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="bus-tag">ADC1_CH4 (GPIO 32)</span>
+        </div>
+      </article>
+
+      <!-- 3. TILT & ATTITUDE SENSOR -->
+      <article class="metric-card card-tilt" id="card-sensor-tilt">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 2a14.5 14.5 0 0 0 0 20 14.5 14.5 0 0 0 0-20"/><path d="M2 12h20"/></svg>
+            <span>SW-520D TILT</span>
+          </div>
+          <span class="card-badge badge-green" id="tilt-badge">LEVEL</span>
+        </div>
+        <div class="card-body">
+          <div class="tilt-status-center">
+            <div class="tilt-indicator-disc" id="tilt-indicator-disc">
+              <div class="tilt-ball" id="tilt-ball"></div>
+              <div class="tilt-crosshair"></div>
+            </div>
+            <div class="tilt-data-details">
+              <div class="tilt-state-title" id="val-tilt-status">LEVEL ATTITUDE</div>
+              <div class="tilt-angles">
+                <span>PITCH: <strong id="val-tilt-pitch">0.0°</strong></span>
+                <span>ROLL: <strong id="val-tilt-roll">0.0°</strong></span>
+              </div>
+            </div>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="bus-tag">Digital SW-520D (GPIO 18 Pull-Up)</span>
+        </div>
+      </article>
+
+      <!-- 4. RAIN & MOISTURE SENSOR -->
+      <article class="metric-card card-rain" id="card-sensor-rain">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><path d="M12 2.69l5.66 5.66a8 8 0 1 1-11.31 0z"/></svg>
+            <span>RAIN & MOISTURE</span>
+          </div>
+          <span class="card-badge" id="rain-condition-badge">BONE DRY</span>
+        </div>
+        <div class="card-body">
+          <div class="primary-value-row">
+            <div class="big-metric" id="val-rain">0<span class="metric-unit">%</span></div>
+            <div class="raw-adc-tag">ADC: <span id="val-rain-raw">3800</span></div>
+          </div>
+          <!-- Gauge Bar -->
+          <div class="gauge-bar-track">
+            <div class="gauge-bar-fill rain-gradient" id="gauge-rain" style="width: 0%;"></div>
+          </div>
+          <div class="sensor-sub-meta">
+            <span>Dry (4095) ➔ Wet (1000)</span>
+            <span id="sub-rain-status">Atmosphere Clear</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="bus-tag">ADC1_CH6 (GPIO 34 Analog)</span>
+        </div>
+      </article>
+
+      <!-- 5. LDR SOLAR LIGHT SENSOR -->
+      <article class="metric-card card-ldr" id="card-sensor-ldr">
+        <div class="card-header">
+          <div class="card-title">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="5"/><path d="M12 1v2M12 21v2M4.22 4.22l1.42 1.42M18.36 18.36l1.42 1.42M1 12h2M21 12h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/></svg>
+            <span>SOLAR / LDR LIGHT</span>
+          </div>
+          <span class="card-badge" id="ldr-condition-badge">DAYLIGHT</span>
+        </div>
+        <div class="card-body">
+          <div class="primary-value-row">
+            <div class="big-metric" id="val-ldr">500<span class="metric-unit">lx</span></div>
+            <div class="raw-adc-tag">ADC: <span id="val-ldr-raw">2000</span></div>
+          </div>
+          <!-- Gauge Bar -->
+          <div class="gauge-bar-track">
+            <div class="gauge-bar-fill ldr-gradient" id="gauge-ldr" style="width: 50%;"></div>
+          </div>
+          <div class="sensor-sub-meta">
+            <span>Range: 0 - 1000 Lux</span>
+            <span id="sub-ldr-solar">Irradiance 50%</span>
+          </div>
+        </div>
+        <div class="card-footer">
+          <span class="bus-tag">ADC1_CH7 (GPIO 35 Photoresistor)</span>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- CORE VISUALIZERS (GRID ROW 2): ARTIFICIAL HORIZON & GPS SATELLITE MAP -->
+    <section class="dual-display-grid">
+
+      <!-- AEROSPACE HUD & ARTIFICIAL HORIZON -->
+      <article class="panel-card hud-panel" id="panel-attitude">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><path d="M12 6v6l4 2"/></svg>
+            <h2>PRIMARY ATTITUDE DIRECTOR & HUD</h2>
+          </div>
+          <div class="hud-top-telemetry">
+            <div class="hud-stat-pill">HDG: <strong id="hud-val-heading">142° SE</strong></div>
+            <div class="hud-stat-pill">PITCH: <strong id="hud-val-pitch">0.0°</strong></div>
+            <div class="hud-stat-pill">ROLL: <strong id="hud-val-roll">0.0°</strong></div>
+          </div>
+        </div>
+        <div class="hud-canvas-container">
+          <!-- Canvas for 60fps Artificial Horizon -->
+          <canvas id="horizon-canvas" width="460" height="340" aria-label="Attitude indicator artificial horizon canvas"></canvas>
+          
+          <!-- Tactical HUD Overlays -->
+          <div class="hud-crosshair-reticle"></div>
+          <div class="hud-compass-tape" id="hud-compass-tape">
+            <span class="tape-deg">120</span>
+            <span class="tape-deg major">135 (SE)</span>
+            <span class="tape-deg needle">▼ 142°</span>
+            <span class="tape-deg major">150</span>
+            <span class="tape-deg">165</span>
+          </div>
+          
+          <div class="hud-tilt-alert-box" id="hud-tilt-alert-box">
+            <span class="alert-icon">⚠️</span>
+            <span>SW-520D TRIGGERED // TILT EXCURSION DETECTED</span>
+          </div>
+        </div>
+        <div class="panel-footer hud-footer">
+          <div class="hud-legend-item">
+            <span class="legend-color sky-color"></span> Sky Arc
+          </div>
+          <div class="hud-legend-item">
+            <span class="legend-color ground-color"></span> Terrain Arc
+          </div>
+          <div class="hud-legend-item">
+            <span class="legend-color reticle-color"></span> Flight Director
+          </div>
+          <div class="attitude-mode-badge" id="hud-attitude-status">ATTITUDE STABLE</div>
+        </div>
+      </article>
+
+      <!-- GPS TACTICAL MAP & SATELLITE TRACKER -->
+      <article class="panel-card map-panel" id="panel-gps">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><polygon points="1 6 1 22 8 18 16 22 23 18 23 2 16 6 8 2 1 6"/><line x1="8" y1="2" x2="8" y2="18"/><line x1="16" y1="6" x2="16" y2="22"/></svg>
+            <h2>TACTICAL GPS ORBITAL TRACKER (NEO-6M)</h2>
+          </div>
+          <div class="map-controls-group">
+            <button type="button" class="btn-micro" id="btn-recenter-map" title="Center map on satellite">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3"/></svg>
+              RECENTER
+            </button>
+            <button type="button" class="btn-micro" id="btn-clear-trail" title="Clear flight path trail">
+              CLEAR TRAIL
+            </button>
+          </div>
+        </div>
+
+        <div class="map-viewport-container">
+          <!-- Leaflet Map Container -->
+          <div id="satellite-map" aria-label="Satellite live GPS map"></div>
+
+          <!-- Tactical Telemetry HUD Overlay -->
+          <div class="map-hud-overlay">
+            <div class="gps-metric-col">
+              <span class="hud-label">LATITUDE</span>
+              <span class="hud-value" id="gps-val-lat">12.971598° N</span>
+            </div>
+            <div class="gps-metric-col">
+              <span class="hud-label">LONGITUDE</span>
+              <span class="hud-value" id="gps-val-lon">77.594562° E</span>
+            </div>
+            <div class="gps-metric-col">
+              <span class="hud-label">ALTITUDE</span>
+              <span class="hud-value" id="gps-val-alt">920.0 m</span>
+            </div>
+            <div class="gps-metric-col">
+              <span class="hud-label">SPEED</span>
+              <span class="hud-value" id="gps-val-spd">0.0 km/h</span>
+            </div>
+            <div class="gps-metric-col">
+              <span class="hud-label">SATELLITES</span>
+              <span class="hud-value highlight" id="gps-val-sats">0 LOCKED</span>
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-footer map-footer">
+          <span class="bus-tag">NEO-6M HardwareSerial 2 (GPIO 16 RX / GPIO 17 TX @ 9600 Baud)</span>
+          <span class="gps-fix-pill" id="gps-fix-indicator">GPS ACQUIRING</span>
+        </div>
+      </article>
+
+    </section>
+
+    <!-- REAL-TIME TELEMETRY CHARTS (GRID ROW 3) -->
+    <section class="charts-section">
+      <article class="panel-card chart-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><line x1="18" y1="20" x2="18" y2="10"/><line x1="12" y1="20" x2="12" y2="4"/><line x1="6" y1="20" x2="6" y2="14"/></svg>
+            <h2>MULTI-CHANNEL TELEMETRY FLIGHT DATA RECORDER</h2>
+          </div>
+          <div class="chart-controls-group">
+            <div class="chart-legend-toggles">
+              <label class="chart-tag-label temp-tag">
+                <input type="checkbox" id="chk-chart-temp" checked> Temp (°C)
+              </label>
+              <label class="chart-tag-label volt-tag">
+                <input type="checkbox" id="chk-chart-volt" checked> Voltage (V)
+              </label>
+              <label class="chart-tag-label rain-tag">
+                <input type="checkbox" id="chk-chart-rain" checked> Rain (%)
+              </label>
+              <label class="chart-tag-label ldr-tag">
+                <input type="checkbox" id="chk-chart-ldr" checked> Light (Lux/10)
+              </label>
+            </div>
+            <button type="button" class="btn-micro" id="btn-chart-pause">PAUSE PLOT</button>
+          </div>
+        </div>
+        <div class="chart-canvas-wrapper">
+          <canvas id="telemetry-chart" height="95" aria-label="Real-time multi-sensor telemetry graph"></canvas>
+        </div>
+      </article>
+    </section>
+
+    <!-- GROUND CONTROL TERMINAL & DATA EXPORT (GRID ROW 4) -->
+    <section class="operations-grid">
+      <!-- TERMINAL CONSOLE -->
+      <article class="panel-card console-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+            <h2>TELEMETRY TELETYPE & NMEA CONSOLE</h2>
+          </div>
+          <div class="console-tools">
+            <div class="filter-pills">
+              <button type="button" class="filter-btn active" data-filter="ALL" id="btn-filter-all">ALL</button>
+              <button type="button" class="filter-btn" data-filter="ALERT" id="btn-filter-alert">ALERTS</button>
+              <button type="button" class="filter-btn" data-filter="JSON" id="btn-filter-json">JSON</button>
+              <button type="button" class="filter-btn" data-filter="GPS" id="btn-filter-gps">GPS</button>
+            </div>
+            <button type="button" class="btn-micro" id="btn-clear-console" title="Clear Console Log">CLEAR</button>
+          </div>
+        </div>
+        <div class="console-body" id="console-stream" tabindex="0" role="region" aria-label="Terminal log output">
+          <!-- Dynamic terminal log lines -->
+          <div class="log-line info">
+            <span class="log-time">[00:00:00.000]</span>
+            <span class="log-source">[SYSTEM]</span>
+            <span class="log-msg">AERO-SAT ONE Mission Control initialized. Awaiting packet stream...</span>
+          </div>
+        </div>
+        <div class="panel-footer console-footer">
+          <div class="console-status-left">
+            <span>STREAM: <strong>ACTIVE</strong></span>
+            <span>BUFFER: <strong id="log-entry-count">1 ENTRIES</strong></span>
+          </div>
+          <div class="export-actions">
+            <button type="button" class="btn-action" id="btn-export-csv" title="Export sensor telemetry data to CSV file">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              EXPORT CSV
+            </button>
+            <button type="button" class="btn-action" id="btn-export-json" title="Export full session packet history as JSON">
+              <svg viewBox="0 0 24 24" width="14" height="14" stroke="currentColor" stroke-width="2" fill="none"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+              EXPORT JSON
+            </button>
+          </div>
+        </div>
+      </article>
+
+      <!-- HARDWARE LINK & PINOUT QUICK REFERENCE -->
+      <article class="panel-card pinout-panel">
+        <div class="panel-header">
+          <div class="panel-title-group">
+            <svg viewBox="0 0 24 24" width="18" height="18" stroke="currentColor" stroke-width="2" fill="none"><rect x="4" y="4" width="16" height="16" rx="2" ry="2"/><rect x="9" y="9" width="6" height="6"/><line x1="9" y1="1" x2="9" y2="4"/><line x1="15" y1="1" x2="15" y2="4"/><line x1="9" y1="20" x2="9" y2="23"/><line x1="15" y1="20" x2="15" y2="23"/><line x1="20" y1="9" x2="23" y2="9"/><line x1="20" y1="14" x2="23" y2="14"/><line x1="1" y1="9" x2="4" y2="9"/><line x1="1" y1="14" x2="4" y2="14"/></svg>
+            <h2>ESP32 HARDWARE PINOUT MAP</h2>
+          </div>
+          <span class="card-badge badge-cyan">ESP32-WROOM-32</span>
+        </div>
+        <div class="pinout-table-wrapper">
+          <table class="pinout-table">
+            <thead>
+              <tr>
+                <th>SENSOR / MODULE</th>
+                <th>ESP32 PIN</th>
+                <th>BUS / TYPE</th>
+                <th>VOLTAGE</th>
+              </tr>
+            </thead>
+            <tbody>
+              <tr>
+                <td><strong>DS18B20 Temp</strong></td>
+                <td><span class="pin-chip">GPIO 4</span></td>
+                <td>OneWire Digital (4.7kΩ)</td>
+                <td>3.3V</td>
+              </tr>
+              <tr>
+                <td><strong>SW-520D Tilt</strong></td>
+                <td><span class="pin-chip">GPIO 18</span></td>
+                <td>Digital Input Pull-Up</td>
+                <td>3.3V</td>
+              </tr>
+              <tr>
+                <td><strong>Rain / Moisture</strong></td>
+                <td><span class="pin-chip">GPIO 34</span></td>
+                <td>ADC1_CH6 (Safe w/ WiFi)</td>
+                <td>3.3V / AO</td>
+              </tr>
+              <tr>
+                <td><strong>LDR Light Sensor</strong></td>
+                <td><span class="pin-chip">GPIO 35</span></td>
+                <td>ADC1_CH7 (Safe w/ WiFi)</td>
+                <td>3.3V / AO</td>
+              </tr>
+              <tr>
+                <td><strong>Voltage Divider</strong></td>
+                <td><span class="pin-chip">GPIO 32</span></td>
+                <td>ADC1_CH4 (0-25V Ratio 5:1)</td>
+                <td>3.3V / S</td>
+              </tr>
+              <tr>
+                <td><strong>NEO-6M GPS</strong></td>
+                <td><span class="pin-chip">GPIO 16 RX</span> / <span class="pin-chip">17 TX</span></td>
+                <td>HardwareSerial 2 (9600)</td>
+                <td>3.3V / 5V</td>
+              </tr>
+            </tbody>
+          </table>
+        </div>
+        <div class="panel-footer pinout-footer">
+          <div class="wifi-info-badge">
+            <span>SSID: <strong>AERO-SAT-AP</strong></span>
+            <span>PASS: <strong>satellite123</strong></span>
+            <span>IP: <strong>192.168.4.1</strong></span>
+          </div>
+        </div>
+      </article>
+    </section>
+
+  </main>
+
+  <!-- MODAL: GROUND STATION CONFIGURATION & SETTINGS -->
+  <dialog class="settings-modal" id="settings-modal">
+    <div class="modal-box">
+      <div class="modal-header">
+        <div class="panel-title-group">
+          <svg viewBox="0 0 24 24" width="20" height="20" stroke="currentColor" stroke-width="2" fill="none"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+          <h3>GROUND STATION LINK CONFIGURATION</h3>
+        </div>
+        <button type="button" class="close-modal-btn" id="btn-close-settings" aria-label="Close modal">&times;</button>
+      </div>
+
+      <div class="modal-body">
+        <!-- Endpoint URL -->
+        <div class="setting-field">
+          <label for="input-endpoint-url">ESP32 REST Telemetry Endpoint URL</label>
+          <div class="input-with-button">
+            <input type="url" id="input-endpoint-url" value="http://192.168.4.1/telemetry" placeholder="http://192.168.4.1/telemetry">
+            <button type="button" class="btn-action" id="btn-test-ping">TEST PING</button>
+          </div>
+          <p class="field-hint">Default Soft AP is <code>http://192.168.4.1/telemetry</code>. If connected to local home WiFi router, enter your assigned ESP32 IP.</p>
+        </div>
+
+        <!-- Polling Interval -->
+        <div class="setting-field">
+          <label for="input-poll-interval">
+            Telemetry Refresh Interval: <span id="disp-slider-interval">200 ms (5.0 Hz)</span>
+          </label>
+          <input type="range" id="input-poll-interval" min="100" max="2000" step="50" value="200">
+          <div class="slider-scale">
+            <span>100ms (10Hz)</span>
+            <span>200ms (5Hz)</span>
+            <span>500ms (2Hz)</span>
+            <span>1000ms (1Hz)</span>
+          </div>
+        </div>
+
+        <!-- Audio Volume -->
+        <div class="setting-field">
+          <label for="input-audio-volume">
+            Mission Audio Effects Volume: <span id="disp-slider-volume">70%</span>
+          </label>
+          <input type="range" id="input-audio-volume" min="0" max="100" step="5" value="70">
+        </div>
+
+        <!-- Simulation Scenario Trigger -->
+        <div class="setting-field sim-options-box">
+          <label>Simulation Trigger Scenarios (Simulator Mode)</label>
+          <div class="sim-button-row">
+            <button type="button" class="btn-micro" id="btn-sim-trigger-tilt">TOGGLE TILT EVENT</button>
+            <button type="button" class="btn-micro" id="btn-sim-trigger-rain">RAIN STORM SPIKE</button>
+            <button type="button" class="btn-micro" id="btn-sim-trigger-sun">SOLAR ECLIPSE / DUSK</button>
+            <button type="button" class="btn-micro" id="btn-sim-trigger-reset">RESET SENSORS</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="modal-footer">
+        <button type="button" class="btn-secondary" id="btn-reset-defaults">RESTORE DEFAULTS</button>
+        <button type="button" class="btn-primary" id="btn-save-settings">APPLY & RECONNECT</button>
+      </div>
+    </div>
+  </dialog>
+
+  <!-- Audio elements generated dynamically via Web Audio API -->
+  <script src="app.js"></script>
+</body>
+</html>
