@@ -42,8 +42,8 @@ graph TD
 The ESP32 runs a dedicated Soft Access Point and REST API:
 
 - **SSID:** `AERO-SAT-AP`
-- **Password:** `satellite123`
-- **Telemetry URL:** `http://192.168.4.1/telemetry`
+- **Password:** `00000000`
+- **Telemetry URL:** `http://192.168.4.1/telemetry` or `http://aerosat.local/telemetry` (Apple Bonjour / mDNS for iPhone)
 - **Poll Rate:** 200 ms (5.0 Hz downlink)
 - **CORS:** Enabled (`Access-Control-Allow-Origin: *`) for direct browser access
 
@@ -115,8 +115,9 @@ The web dashboard (`index.html`) provides a complete mission control environment
 4. Open Serial Monitor at **115200 baud** to verify boot messages.
 
 ### 2. Connect & Launch Ground Station
-1. On your PC, connect to Wi-Fi: **`AERO-SAT-AP`** (Password: **`satellite123`**).
-2. Open [`index.html`](file:///c:/Users/BB/OneDrive/Desktop/sat/index.html) in any modern browser (Chrome, Edge, Firefox).
+1. On your PC or iPhone, connect to Wi-Fi: **`AERO-SAT-AP`** (Password: **`00000000`**).
+   > **iPhone Users**: Turn **OFF Mobile Data / Cellular** in Control Center while connected to `AERO-SAT-AP` so iOS doesn't route local telemetry requests over 5G/LTE.
+2. Open [`index.html`](file:///c:/Users/BB/OneDrive/Desktop/sat/index.html) in your browser (or Safari on iPhone at `http://192.168.4.1/telemetry` / `http://aerosat.local`).
 3. The dashboard will automatically lock onto `http://192.168.4.1/telemetry` and begin streaming live telemetry!
 4. To test without powering the ESP32, toggle **`SIMULATOR`** at the top right of the dashboard.
 

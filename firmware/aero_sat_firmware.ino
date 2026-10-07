@@ -12,14 +12,15 @@
  *   7. Voltage Sensor (0-25V Divider -> GPIO 32)
  *
  * Ground Station Link:
- *   - Wi-Fi AP: "AERO-SAT-AP" (Password: "satellite123")
- *   - Ground Station Endpoint: http://192.168.4.1/telemetry
+ *   - Wi-Fi AP: "AERO-SAT-AP" (Password: "00000000")
+ *   - Ground Station Endpoint: http://192.168.4.1/telemetry or http://aerosat.local/telemetry
  *   - Direct CORS enabled for web browser dashboard
  * ======================================================================================
  */
 
 #include <WiFi.h>
 #include <WebServer.h>
+#include <ESPmDNS.h>
 #include <OneWire.h>
 #include <DallasTemperature.h>
 #include <TinyGPS++.h>
@@ -47,9 +48,13 @@
 // 2. CONFIGURATION & CONSTANTS
 // --------------------------------------------------------------------------------------
 
-// Wi-Fi Soft Access Point Credentials
+// Wi-Fi Soft Access Point Credentials (ESP32 broadcasts this network)
 const char* ap_ssid     = "AERO-SAT-AP";
-const char* ap_password = "satellite123";
+const char* ap_password = "00000000"; // 8 zeros (WPA2 compatible for iPhone)
+
+// Optional: iPhone Hotspot (ESP32 also connects to iPhone hotspot if enabled)
+const char* sta_ssid     = "iPhone";
+const char* sta_password = "00000000";
 
 // Voltage Sensor Calibration Factor
 // Standard 0-25V sensor uses R1=30kΩ and R2=7.5kΩ -> Divider ratio = (30+7.5)/7.5 = 5.0
@@ -230,15 +235,23 @@ void setup() {
   tempSensor.begin();
   tempSensor.setResolution(10); // 10-bit resolution for faster conversion
 
-  // Start Wi-Fi Soft Access Point
-  WiFi.mode(WIFI_AP);
+  // Start Wi-Fi in Dual Mode (Broadcasts AP & connects to iPhone Hotspot if available)
+  WiFi.mode(WIFI_AP_STA);
   WiFi.softAP(ap_ssid, ap_password);
-  IPAddress ip = WiFi.softAPIP();
+  WiFi.begin(sta_ssid, sta_password); // Optional iPhone Hotspot join
 
+  IPAddress apIp = WiFi.softAPIP();
   Serial.println("[WIFI] Access Point Started: " + String(ap_ssid));
-  Serial.print("[WIFI] Satellite IP Address: http://");
-  Serial.println(ip);
-  Serial.println("[LINK] Telemetry JSON Endpoint: http://" + ip.toString() + "/telemetry");
+  Serial.println("[WIFI] Access Point Password: " + String(ap_password));
+  Serial.print("[WIFI] Satellite AP IP: http://");
+  Serial.println(apIp);
+  Serial.println("[LINK] Telemetry JSON Endpoint: http://" + apIp.toString() + "/telemetry");
+
+  // Start Apple Bonjour / mDNS Responder (Native resolution on iPhone Safari)
+  if (MDNS.begin("aerosat")) {
+    MDNS.addService("http", "tcp", 80);
+    Serial.println("[MDNS] iPhone Safari Hostname: http://aerosat.local/telemetry");
+  }
 
   // Web Server Routing
   server.on("/telemetry", HTTP_GET, handleTelemetryJson);

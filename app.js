@@ -413,7 +413,7 @@
           if (window.location.protocol === 'https:' && config.endpoint.startsWith('http:')) {
             logConsole('SECURITY', `HTTPS Mixed-Content: Browser blocks http:// local calls from https:// origins (Render). In Chrome/Edge: click Site settings (padlock) > Insecure content: Allow, OR switch to SIMULATOR mode.`, 'warn');
           } else {
-            logConsole('NETWORK', `Cannot reach ${config.endpoint}. Please connect to Wi-Fi "AERO-SAT-AP" (Pass: satellite123). Or switch to SIMULATOR mode.`, 'alert');
+            logConsole('NETWORK', `Cannot reach ${config.endpoint}. Connect to Wi-Fi "AERO-SAT-AP" (Pass: 00000000). iPhone tip: Turn OFF Mobile Data in iPhone Control Center so iOS routes traffic to the ESP32 Wi-Fi.`, 'alert');
           }
         }
       } else {
@@ -1452,7 +1452,7 @@
             alert(`HTTP Warning: Received status ${res.status}`);
           }
         } catch (e) {
-          alert(`PING FAILED: ${e.message}\nEnsure your device is connected to Wi-Fi "AERO-SAT-AP" (Password: satellite123)`);
+          alert(`PING FAILED: ${e.message}\nEnsure your device is connected to Wi-Fi "AERO-SAT-AP" (Password: 00000000)`);
         } finally {
           el.btnTestPing.textContent = 'TEST PING';
         }
